@@ -1,0 +1,228 @@
+(function() {
+    'use strict';
+    
+    /**
+     * Плагин Admin для Lampa
+     * Отображает информацию о всех установленных плагинах
+     */
+    
+    function Admin(object) {
+        // Основные настройки
+        this.settings = object;
+        this.background = false;
+        this.interface = $('<div class="admin-panel"></div>');
+        this.plugins = [];
+        
+        // Стили для админ-панели
+        $('body').append(`
+            <style>
+                .admin-panel {
+                    padding: 1.5em;
+                }
+                .admin-panel__title {
+                    font-size: 2em;
+                    margin-bottom: 1em;
+                }
+                .admin-panel__list {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 1em;
+                }
+                .admin-panel__plugin {
+                    background-color: rgba(255,255,255,0.1);
+                    border-radius: 0.5em;
+                    padding: 1em;
+                    width: 100%;
+                    margin-bottom: 1em;
+                }
+                .admin-panel__plugin-title {
+                    font-size: 1.2em;
+                    font-weight: bold;
+                    margin-bottom: 0.5em;
+                }
+                .admin-panel__plugin-info {
+                    margin-top: 0.5em;
+                    opacity: 0.7;
+                    font-size: 0.9em;
+                }
+                .admin-panel__plugin-status {
+                    display: inline-block;
+                    padding: 0.2em 0.5em;
+                    border-radius: 0.3em;
+                    margin-left: 0.5em;
+                    font-size: 0.8em;
+                }
+                .admin-panel__plugin-status--active {
+                    background-color: #4CAF50;
+                }
+                .admin-panel__plugin-status--inactive {
+                    background-color: #F44336;
+                }
+                .admin-panel__counts {
+                    margin-bottom: 1em;
+                    padding: 0.5em;
+                    background-color: rgba(255,255,255,0.05);
+                    border-radius: 0.3em;
+                }
+                .admin-panel__button {
+                    margin-top: 1em;
+                    background-color: #3498db;
+                    border: none;
+                    padding: 0.5em 1em;
+                    border-radius: 0.3em;
+                    cursor: pointer;
+                }
+                .admin-panel__button:hover {
+                    background-color: #2980b9;
+                }
+                .admin-panel__plugin-details {
+                    margin-top: 0.5em;
+                    font-size: 0.9em;
+                }
+            </style>
+        `);
+        
+        // Инициализация
+        this.init = function() {
+            this.collectPluginsInfo();
+            this.render();
+            return this.interface;
+        };
+        
+        // Сбор информации о плагинах
+        this.collectPluginsInfo = function() {
+            // Получаем список плагинов из Lampa
+            if (Lampa.Plugins && Lampa.Plugins.plugins) {
+                this.plugins = [];
+                
+                Object.keys(Lampa.Plugins.plugins).forEach((key) => {
+                    const plugin = Lampa.Plugins.plugins[key];
+                    
+                    this.plugins.push({
+                        name: plugin.name || key,
+                        version: plugin.version || 'Неизвестно',
+                        author: plugin.author || 'Неизвестно',
+                        description: plugin.description || 'Описание отсутствует',
+                        path: plugin.path || 'Неизвестно',
+                        status: plugin.status || 'active',
+                        appearance: plugin.appearance || {},
+                        init: typeof plugin.init === 'function',
+                        settings: typeof plugin.settings === 'function',
+                        size: plugin.size || 'Неизвестно'
+                    });
+                });
+            }
+        };
+        
+        // Отрисовка интерфейса
+        this.render = function() {
+            this.interface.empty();
+            
+            // Заголовок
+            this.interface.append('<div class="admin-panel__title">Панель администратора Lampa</div>');
+            
+            // Общая статистика
+            const activePlugins = this.plugins.filter(p => p.status === 'active').length;
+            const inactivePlugins = this.plugins.length - activePlugins;
+            
+            this.interface.append(`
+                <div class="admin-panel__counts">
+                    Всего плагинов: ${this.plugins.length}<br>
+                    Активных: ${activePlugins}<br>
+                    Неактивных: ${inactivePlugins}
+                </div>
+            `);
+            
+            // Кнопка обновления
+            const refreshButton = $('<button class="admin-panel__button">Обновить данные</button>');
+            refreshButton.on('click', () => {
+                this.collectPluginsInfo();
+                this.render();
+                Lampa.Noty.show('Информация о плагинах обновлена');
+            });
+            this.interface.append(refreshButton);
+            
+            // Список плагинов
+            const list = $('<div class="admin-panel__list"></div>');
+            
+            this.plugins.forEach((plugin) => {
+                const statusClass = plugin.status === 'active' ? 'admin-panel__plugin-status--active' : 'admin-panel__plugin-status--inactive';
+                const statusText = plugin.status === 'active' ? 'Активен' : 'Неактивен';
+                
+                const pluginElement = $(`
+                    <div class="admin-panel__plugin">
+                        <div class="admin-panel__plugin-title">
+                            ${plugin.name}
+                            <span class="admin-panel__plugin-status ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="admin-panel__plugin-info">
+                            Версия: ${plugin.version}<br>
+                            Автор: ${plugin.author}
+                        </div>
+                        <div class="admin-panel__plugin-details">
+                            ${plugin.description}
+                        </div>
+                        <div class="admin-panel__plugin-details">
+                            Путь: ${plugin.path}<br>
+                            Размер: ${plugin.size}<br>
+                            Имеет инициализацию: ${plugin.init ? 'Да' : 'Нет'}<br>
+                            Имеет настройки: ${plugin.settings ? 'Да' : 'Нет'}
+                        </div>
+                    </div>
+                `);
+                
+                list.append(pluginElement);
+            });
+            
+            this.interface.append(list);
+        };
+        
+        // Уничтожение
+        this.destroy = function() {
+            this.interface.remove();
+        };
+    }
+    
+    // Регистрация плагина
+    function startPlugin() {
+        window.plugin_admin_ready = true;
+        
+        Lampa.Component.add('admin', Admin);
+        
+        // Добавляем в меню
+        Lampa.Template.add('admin_button', '<li class="menu__item admin selector"><div class="menu__ico"><svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v5.7c0 4.67-3.13 8.42-7 9.6-3.87-1.18-7-4.93-7-9.6V6.3l7-3.12zM12 5a7 7 0 0 0-7 7c0 3.87 3.13 7 7 7s7-3.13 7-7a7 7 0 0 0-7-7zm0 2a5 5 0 0 1 0 10c-2.76 0-5-2.24-5-5s2.24-5 5-5z"/></svg></div><div class="menu__text">Admin</div></li>');
+        
+        const button = $('<li class="menu__item admin selector"><div class="menu__ico"><svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v5.7c0 4.67-3.13 8.42-7 9.6-3.87-1.18-7-4.93-7-9.6V6.3l7-3.12zM12 5a7 7 0 0 0-7 7c0 3.87 3.13 7 7 7s7-3.13 7-7a7 7 0 0 0-7-7zm0 2a5 5 0 0 1 0 10c-2.76 0-5-2.24-5-5s2.24-5 5-5z"/></svg></div><div class="menu__text">Admin</div></li>');
+        
+        button.on('hover:enter', function() {
+            Lampa.Activity.push({
+                id: 'admin',
+                title: 'Администрирование',
+                component: 'admin',
+                type: 'plugin'
+            });
+        });
+        
+        $('.menu .menu__list').append(button);
+        
+        // Обновляем скролл
+        if (Lampa.Select) {
+            let last = $('.menu .menu__list .menu__item:last-child')[0];
+            
+            if (last) Lampa.Select.add(last);
+        }
+        
+        // Уведомление о загрузке плагина
+        Lampa.Noty.show('Плагин Admin успешно загружен');
+    }
+    
+    // Проверка зависимостей и запуск плагина
+    if (!window.plugin_admin_ready) {
+        if (window.Lampa) {
+            startPlugin();
+        } else {
+            // Ждем загрузку Lampa
+            window.addEventListener('lampa_ready', startPlugin);
+        }
+    }
+})();
